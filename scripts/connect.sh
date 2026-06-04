@@ -99,21 +99,28 @@ $otp
 EOF
     local rc=$?
 
+    # --background forks immediately; rc is a fork-failure indicator only,
+    # NOT an auth-success signal. Real success is verified by _wait_for_tunnel
+    # + verify_tunnel below. Set SHORTI_PING_HOST for the strongest health check.
     if [[ $rc -ne 0 ]]; then
-        _log "ERROR" "openconnect exited with code $rc"
+        _log "ERROR" "openconnect fork failed (exit code: $rc)"
         return 1
     fi
 
     if ! _wait_for_tunnel; then
-        _log "ERROR" "Tun interface did not appear within 15 seconds"
+        _log "ERROR" "Tun interface did not appear within 15 seconds — auth may have failed"
         return 1
     fi
+
+    # Brief settle: give openconnect time to complete auth before we probe the tunnel.
+    # A failed auth may briefly raise the tun interface before tearing it down.
+    sleep 2
 
     if ! verify_tunnel; then
         return 1
     fi
 
-    _log "INFO" "VPN connected (pid: $(<"$PIDFILE"))"
+    _log "INFO" "VPN connected (pid: $(<"$PIDFILE"))${SHORTI_PING_HOST:+ — ping host: $SHORTI_PING_HOST}"
     return 0
 }
 
