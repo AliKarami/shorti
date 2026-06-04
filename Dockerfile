@@ -6,6 +6,8 @@ FROM alpine:3.21 AS base
 # iproute2        — `ip tuntap show` / route setup
 # iptables        — MASQUERADE + FORWARD gateway rules (routing.sh)
 # iputils-ping    — tunnel health probe (`ping -W`)
+# ca-certificates — system CA bundle so openconnect can verify the server cert
+#                   via system trust (otherwise --servercert pinning is required)
 # curl            — healthcheck client
 # python3         — health.sh HTTP server + totp.sh fallback
 RUN apk add --no-cache \
@@ -15,6 +17,7 @@ RUN apk add --no-cache \
     iproute2 \
     iptables \
     iputils-ping \
+    ca-certificates \
     curl \
     python3
 
