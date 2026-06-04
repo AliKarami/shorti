@@ -1,0 +1,13 @@
+services:
+  test:
+    build:
+      context: .
+      target: test
+    environment:
+      - SHORTI_SERVER=vpn.example.com
+      - SHORTI_USERNAME=testuser
+      - SHORTI_PASSWORD=testpass
+      - SHORTI_TOTP_SECRET=JBSWY3DPEHPK3PXP
+      - SHORTI_MAX_RETRIES=2
+      - SHORTI_RETRY_DELAY=1
+      - SHORTI_MONITOR_INTERVAL=5
