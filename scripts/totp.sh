@@ -31,6 +31,9 @@ PYEOF
 generate_totp() {
     local otp=""
 
+    # SHORTI_TOTP_CMD and SHORTI_TOTP_SECRET_CMD are intentionally evaluated as shell
+    # commands — they are expected to be operator-configured strings (e.g. "op read ...")
+    # sourced from the trusted .env file. Do not expose these to untrusted input.
     if [[ -n "${SHORTI_TOTP_CMD:-}" ]]; then
         otp="$(eval "$SHORTI_TOTP_CMD" 2>/dev/null)" || true
     elif [[ -n "${SHORTI_TOTP_SECRET_CMD:-}" ]]; then
@@ -44,7 +47,7 @@ generate_totp() {
         return 1
     fi
 
-    if [[ -z "$otp" || ${#otp} -lt 6 ]]; then
+    if [[ ! "$otp" =~ ^[0-9]{6}$ ]]; then
         _shorti_log_totp "ERROR" "Failed to generate OTP (got: '${otp}')"
         return 1
     fi
