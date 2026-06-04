@@ -6,7 +6,7 @@
 > from the original code blocks below in three deliberate ways. Treat the live
 > files as the source of truth:
 > - **`compose.yml` uses `network_mode: host`** (not a bridge network). The VPN
->   tunnel and iptables rules must live in the host namespace for the labstation
+>   tunnel and iptables rules must live in the host namespace for the gateway host
 >   to act as a transparent gateway for Mikrotik-routed LAN traffic. A bridge
 >   network would trap the tunnel inside the container.
 > - **`routing.sh` adds a TCP MSS clamp** (`TCPMSS --clamp-mss-to-pmtu`) on the
@@ -16,12 +16,12 @@
 > - **`compose.yml` declares a Docker `healthcheck`** against `/health`, and the
 >   unused `./config:/etc/shorti` mount was dropped.
 > - **The health/metrics port defaults to `9798`, not `8080`.** Host networking
->   binds it directly on the labstation, so it was moved off the busy dev-app
+>   binds it directly on the gateway host, so it was moved off the busy dev-app
 >   `8080`. Override with `HEALTH_PORT`. Code blocks below still show `8080`.
 
-**Goal:** Build a Docker Compose VPN gateway that connects to a Fortinet VPN via OpenConnect, maintains the tunnel with auto-reconnect, and masquerades traffic so any device routed through the labstation reaches the work network transparently.
+**Goal:** Build a Docker Compose VPN gateway that connects to a Fortinet VPN via OpenConnect, maintains the tunnel with auto-reconnect, and masquerades traffic so any device routed through the gateway host reaches the remote network transparently.
 
-**Architecture:** A single privileged container runs OpenConnect in the background, managed by a bash watchdog (`monitor.sh`) that detects tunnel drops and reconnects. On each successful connect, `routing.sh` installs iptables MASQUERADE rules so the host (and any device whose traffic Mikrotik routes to the labstation) egresses through the VPN tunnel. A tiny Python HTTP server on port 8080 exposes `/health` and `/metrics` for polling.
+**Architecture:** A single privileged container runs OpenConnect in the background, managed by a bash watchdog (`monitor.sh`) that detects tunnel drops and reconnects. On each successful connect, `routing.sh` installs iptables MASQUERADE rules so the host (and any device whose traffic Mikrotik routes to the gateway host) egresses through the VPN tunnel. A tiny Python HTTP server on port 8080 exposes `/health` and `/metrics` for polling.
 
 **Tech Stack:** Ubuntu 24.04, OpenConnect (Fortinet protocol), oathtool (TOTP, python3 fallback), iptables, bats-core (bash unit tests), Docker Compose v2, Python 3 (health endpoint)
 
@@ -46,7 +46,7 @@
 | `tests/test_routing.bats` | Unit tests for routing.sh helper functions |
 | `tests/test_health.bats` | Unit tests for health.sh HTTP responses |
 | `tests/test_entrypoint.bats` | Unit tests for config validation |
-| `mikrotik/routing.rsc` | RouterOS script: add static routes for work CIDRs |
+| `mikrotik/routing.rsc` | RouterOS script: add static routes for VPN CIDRs |
 | `mikrotik/README.md` | Step-by-step Mikrotik setup guide |
 
 ---
@@ -1323,21 +1323,21 @@ git commit -m "test: add integration smoke test for container startup and health
 
 ```routeros
 # mikrotik/routing.rsc
-# RouterOS script: route work traffic through the shorti labstation gateway
+# RouterOS script: route VPN-bound traffic through the shorti gateway host
 #
 # Assumptions:
-#   - shorti labstation LAN IP: 192.168.1.50  (change to match yours)
-#   - Work VPN subnets: 10.0.0.0/8            (change to match your VPN's pushed routes)
+#   - shorti gateway host LAN IP: 192.168.1.50  (change to match yours)
+#   - VPN subnets: 10.0.0.0/8                  (change to match your VPN's pushed routes)
 #   - Your LAN interface: bridge (or ether1 — adjust as needed)
 #
 # Apply with: /import file=routing.rsc
 
-# Static route: send work subnet traffic to the labstation instead of the default gateway
+# Static route: send VPN subnet traffic to the gateway host instead of the default gateway
 /ip route
-add dst-address=10.0.0.0/8 gateway=192.168.1.50 comment="shorti: work VPN via labstation"
+add dst-address=10.0.0.0/8 gateway=192.168.1.50 comment="shorti: VPN via gateway host"
 
 # Optional: if your VPN uses a different subnet (e.g. 172.16.0.0/12) add another route:
-# add dst-address=172.16.0.0/12 gateway=192.168.1.50 comment="shorti: work VPN via labstation"
+# add dst-address=172.16.0.0/12 gateway=192.168.1.50 comment="shorti: VPN via gateway host"
 ```
 
 - [ ] **Step 2: Overwrite mikrotik/README.md with the full guide**
@@ -1345,9 +1345,9 @@ add dst-address=10.0.0.0/8 gateway=192.168.1.50 comment="shorti: work VPN via la
 ```markdown
 # Mikrotik Integration Guide
 
-shorti runs on your labstation and connects to your work VPN. Mikrotik forwards
-work-bound traffic to the labstation, which masquerades it through the tunnel.
-Your other devices reach work resources without running their own VPN client.
+shorti runs on your gateway host and connects to a VPN. Mikrotik forwards
+VPN-bound traffic to the gateway host, which masquerades it through the tunnel.
+Your other devices reach resources behind the VPN without running their own VPN client.
 
 ## Architecture
 
@@ -1359,25 +1359,25 @@ Your device (192.168.1.x)
    Mikrotik router
         | static route: 10.0.0.0/8 → 192.168.1.50
         v
-   labstation (192.168.1.50)
+   gateway host (192.168.1.50)
    running shorti container
         | iptables MASQUERADE
         v
-   work VPN tunnel (tun0)
+   VPN tunnel (tun0)
         v
-   work network (10.x.x.x)
+   remote network (10.x.x.x)
 ```
 
 ## Prerequisites
 
-1. shorti is running on your labstation:
+1. shorti is running on your gateway host:
    ```bash
    docker compose up -d
    curl http://192.168.1.50:8080/health
    # → {"status":"connected"}
    ```
 
-2. You know your work VPN subnets (ask your network admin, or check `ip route` inside
+2. You know your VPN subnets (ask your network admin, or check `ip route` inside
    the running container: `docker exec shorti-vpn ip route`).
 
 ## Mikrotik Setup
@@ -1385,8 +1385,8 @@ Your device (192.168.1.x)
 ### Option A: RouterOS script (Winbox terminal)
 
 1. Copy `routing.rsc` to your Mikrotik (via Files menu or SCP).
-2. Edit the file: replace `192.168.1.50` with your labstation's actual LAN IP,
-   and `10.0.0.0/8` with your actual work VPN subnets.
+2. Edit the file: replace `192.168.1.50` with your gateway host's actual LAN IP,
+   and `10.0.0.0/8` with your actual VPN subnets.
 3. Apply it:
    ```
    /import file=routing.rsc
@@ -1395,13 +1395,13 @@ Your device (192.168.1.x)
 ### Option B: Manual via Winbox
 
 IP → Routes → Add:
-- Dst. Address: `10.0.0.0/8`  (your work subnet)
-- Gateway: `192.168.1.50`     (your labstation IP)
-- Comment: `shorti work VPN`
+- Dst. Address: `10.0.0.0/8`  (your VPN subnet)
+- Gateway: `192.168.1.50`     (your gateway host IP)
+- Comment: `shorti VPN`
 
 ### Verify
 
-From any device on your LAN, try reaching a work-only resource:
+From any device on your LAN, try reaching a resource only routable over the VPN:
 ```bash
 curl -I http://intranet.yourcompany.com
 ```

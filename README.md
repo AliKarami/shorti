@@ -1,42 +1,42 @@
 # shorti
 
-A Dockerized **Fortinet VPN gateway** for a home labstation. shorti connects to a
-work VPN via [OpenConnect](https://www.infradead.org/openconnect/), handles
-password + TOTP authentication, keeps the tunnel alive with an auto-reconnect
-watchdog, and masquerades traffic so any device on your LAN can reach work
-resources — without running its own VPN client.
+A Dockerized **Fortinet VPN gateway** for a home server. shorti connects to a
+VPN via [OpenConnect](https://www.infradead.org/openconnect/), handles password +
+TOTP authentication, keeps the tunnel alive with an auto-reconnect watchdog, and
+masquerades traffic so any device on your LAN can reach resources behind the VPN —
+without running its own VPN client.
 
-It's the Linux/server counterpart to [`morti`](https://github.com/AliKarami/morti),
+It's the Linux/server counterpart to [`morti`](https://github.com/arastu/morti),
 which does the same job interactively on macOS.
 
 ## How it works
 
 ```
 Your device (192.168.1.x)
-        │  traffic to 10.x.x.x (work subnet)
+        │  traffic to 10.x.x.x (VPN subnet)
         ▼
    Mikrotik router
         │  static route: 10.0.0.0/8 → 192.168.1.50
         ▼
-   labstation (192.168.1.50)
+   gateway host (192.168.1.50)
    running shorti  ── host network mode ──┐
         │  iptables MASQUERADE + MSS clamp │
         ▼                                  │
-   work VPN tunnel (tun0) ─────────────────┘
+   VPN tunnel (tun0) ───────────────────────┘
         ▼
-   work network (10.x.x.x)
+   remote network (10.x.x.x)
 ```
 
 A single privileged container runs OpenConnect in the background, supervised by a
 bash watchdog (`monitor.sh`) that detects tunnel drops and reconnects. On each
 successful connect, `routing.sh` installs `iptables` MASQUERADE rules (plus a TCP
-MSS clamp for the tunnel's smaller MTU) so the labstation forwards LAN traffic
+MSS clamp for the tunnel's smaller MTU) so the gateway host forwards LAN traffic
 through the tunnel. A tiny Python HTTP server exposes `/health` and `/metrics` for
 polling.
 
 The container runs with **`network_mode: host`** so the tunnel, routes, IP
 forwarding, and NAT rules live in the host's network namespace — which is what
-makes the labstation's own IP a valid gateway for Mikrotik-routed traffic.
+makes the gateway host's own IP a valid gateway for Mikrotik-routed traffic.
 
 ## Quick start
 
@@ -58,8 +58,8 @@ makes the labstation's own IP a valid gateway for Mikrotik-routed traffic.
    curl http://localhost:9798/health  # → {"status":"connected"}
    ```
 
-3. **Route traffic.** Point your Mikrotik (or any router) at the labstation for
-   your work subnets — see [`mikrotik/README.md`](mikrotik/README.md).
+3. **Route traffic.** Point your Mikrotik (or any router) at the gateway host for
+   the VPN's subnets — see [`mikrotik/README.md`](mikrotik/README.md).
 
 ## Configuration
 
@@ -69,7 +69,7 @@ All configuration is via environment variables in `.env`.
 
 | Variable | Description |
 |----------|-------------|
-| `SHORTI_SERVER` | VPN server hostname (e.g. `vpn.yourcompany.com`) |
+| `SHORTI_SERVER` | VPN server hostname (e.g. `vpn.example.com`) |
 | `SHORTI_USERNAME` | Your VPN username |
 | **Password** — set one of: | |
 | `SHORTI_PASSWORD` | Password as a literal value |
@@ -128,8 +128,8 @@ helpers can be unit-tested in isolation.
 
 - A Linux host with Docker + Docker Compose v2
 - `/dev/net/tun` available and the `NET_ADMIN` capability (granted in `compose.yml`)
-- A router (e.g. Mikrotik) to route work subnets at the labstation — optional if
-  you only want the gateway on the host itself
+- A router (e.g. Mikrotik) to route the VPN's subnets at the gateway host — optional
+  if you only want the gateway on the host itself
 
 ## License
 

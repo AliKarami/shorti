@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     # Host networking: tun0, routes, IP forwarding, and the iptables MASQUERADE
     # rules all live in the host namespace — where Mikrotik-routed LAN traffic
-    # (sent to the labstation's IP) actually arrives. Bridge mode would trap the
+    # (sent to the gateway host's IP) actually arrives. Bridge mode would trap the
     # tunnel inside the container and the gateway path would never see that traffic.
     # The health endpoint binds directly on the host's :9798 (a port chosen to
     # stay clear of the common dev-app 8080). Override with HEALTH_PORT in .env.
