@@ -4,6 +4,15 @@ shorti runs on your labstation and connects to your work VPN. Mikrotik forwards
 work-bound traffic to the labstation, which masquerades it through the tunnel.
 Your other devices reach work resources without running their own VPN client.
 
+> **Networking model:** the shorti container runs with `network_mode: host`
+> (see `compose.yml`). The VPN `tun0` interface, the kernel routes openconnect
+> installs, IP forwarding, and the iptables MASQUERADE/MSS rules all live in the
+> **host's** network namespace. That is what makes the labstation's own LAN IP
+> (`192.168.1.50` below) a valid gateway: traffic Mikrotik routes there arrives
+> on the host and is forwarded straight into the tunnel. A bridge-networked
+> container would trap the tunnel in its own namespace and the gateway path
+> would never see that traffic.
+
 ## Architecture
 
 ```
@@ -28,10 +37,13 @@ Your device (192.168.1.x)
 1. shorti is running on your labstation:
    ```bash
    docker compose up -d
+   docker ps                       # STATUS shows (healthy) once the tunnel is up
    curl http://192.168.1.50:8080/health
    # → {"status":"connected"}   (HTTP 200)
    # → {"status":"disconnected"} (HTTP 503 — VPN is still connecting or has dropped)
    ```
+   The container has a Docker healthcheck wired to `/health`, so `docker ps`
+   reflects the live tunnel state without needing to curl.
 
 2. You know your work VPN subnets (ask your network admin, or check `ip route` inside
    the running container after it connects: `docker exec shorti-vpn ip route`).

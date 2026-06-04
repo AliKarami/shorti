@@ -1,0 +1,31 @@
+services:
+  vpn:
+    build: .
+    container_name: shorti-vpn
+    restart: unless-stopped
+    # Host networking: tun0, routes, IP forwarding, and the iptables MASQUERADE
+    # rules all live in the host namespace — where Mikrotik-routed LAN traffic
+    # (sent to the labstation's IP) actually arrives. Bridge mode would trap the
+    # tunnel inside the container and the gateway path would never see that traffic.
+    # The health endpoint binds directly on the host's :8080 (the ports: key is
+    # ignored under host mode).
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.ip_forward=1
+    env_file:
+      - .env
+    volumes:
+      - shorti-logs:/var/log/shorti
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  shorti-logs:

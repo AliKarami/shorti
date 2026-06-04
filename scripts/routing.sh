@@ -37,6 +37,7 @@ _flush_rules() {
     iptables -t nat -D POSTROUTING -o "$tun" -j MASQUERADE 2>/dev/null || true
     iptables -D FORWARD -i "$lan"  -o "$tun" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -i "$tun" -o "$lan" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+    iptables -t mangle -D FORWARD -o "$tun" -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
 }
 
 setup_routing() {
@@ -64,8 +65,12 @@ setup_routing() {
     iptables -A FORWARD -i "$lan"  -o "$tun" -j ACCEPT
     # Allow established return traffic from the tunnel back to LAN
     iptables -A FORWARD -i "$tun" -o "$lan" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    # Clamp TCP MSS to the tunnel's path MTU. Without this, forwarded TCP
+    # connections blackhole on large packets (TLS handshakes stall mid-stream)
+    # because the VPN MTU is smaller than the LAN's and PMTU discovery often fails.
+    iptables -t mangle -A FORWARD -o "$tun" -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
-    _log "INFO" "Routing configured (masquerade via $tun)"
+    _log "INFO" "Routing configured (masquerade + MSS clamp via $tun)"
     mkdir -p "$(dirname "$_TUN_STATE_FILE")"
     echo "$tun" > "$_TUN_STATE_FILE"
 }

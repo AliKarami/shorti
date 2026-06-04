@@ -8,7 +8,6 @@ import http.server
 import json
 import os
 import subprocess
-import sys
 
 PIDFILE        = os.environ.get("SHORTI_OPENCONNECT_PIDFILE", "/var/run/shorti-openconnect.pid")
 RECONNECT_FILE = os.environ.get("RECONNECT_COUNT_FILE", "/var/run/shorti-reconnect-count")
