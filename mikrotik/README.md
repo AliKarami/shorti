@@ -38,7 +38,7 @@ Your device (192.168.1.x)
    ```bash
    docker compose up -d
    docker ps                       # STATUS shows (healthy) once the tunnel is up
-   curl http://192.168.1.50:8080/health
+   curl http://192.168.1.50:9798/health
    # → {"status":"connected"}   (HTTP 200)
    # → {"status":"disconnected"} (HTTP 503 — VPN is still connecting or has dropped)
    ```
@@ -86,14 +86,14 @@ The first hop should be `192.168.1.50`.
 Mikrotik can poll the shorti health endpoint and alert or re-route on failure:
 
 ```routeros
-/tool fetch url="http://192.168.1.50:8080/health" output=user
+/tool fetch url="http://192.168.1.50:9798/health" output=user
 # Returns: {"status":"connected"} or {"status":"disconnected"}
 ```
 
 ```routeros
 # Example: check every 5 minutes, log the result
 /system scheduler
-add interval=5m name="shorti-health" on-event="/tool fetch url=\"http://192.168.1.50:8080/health\" output=user" start-time=startup
+add interval=5m name="shorti-health" on-event="/tool fetch url=\"http://192.168.1.50:9798/health\" output=user" start-time=startup
 ```
 
 You can use `/system scheduler` to run this periodically and send a notification

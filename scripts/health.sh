@@ -11,7 +11,7 @@ import subprocess
 
 PIDFILE        = os.environ.get("SHORTI_OPENCONNECT_PIDFILE", "/var/run/shorti-openconnect.pid")
 RECONNECT_FILE = os.environ.get("RECONNECT_COUNT_FILE", "/var/run/shorti-reconnect-count")
-PORT           = int(os.environ.get("HEALTH_PORT", "8080"))
+PORT           = int(os.environ.get("HEALTH_PORT", "9798"))
 
 
 def is_vpn_connected() -> bool:

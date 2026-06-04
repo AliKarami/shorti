@@ -37,7 +37,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _log "shorti starting"
     validate_config || exit 1
 
-    _log "Starting health endpoint on :${HEALTH_PORT:-8080}"
+    _log "Starting health endpoint on :${HEALTH_PORT:-9798}"
     /app/scripts/health.sh &
 
     _log "Handing over to monitor"

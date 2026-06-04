@@ -15,6 +15,9 @@
 >   forwarded TCP through the smaller-MTU tunnel blackholes on large packets.
 > - **`compose.yml` declares a Docker `healthcheck`** against `/health`, and the
 >   unused `./config:/etc/shorti` mount was dropped.
+> - **The health/metrics port defaults to `9798`, not `8080`.** Host networking
+>   binds it directly on the labstation, so it was moved off the busy dev-app
+>   `8080`. Override with `HEALTH_PORT`. Code blocks below still show `8080`.
 
 **Goal:** Build a Docker Compose VPN gateway that connects to a Fortinet VPN via OpenConnect, maintains the tunnel with auto-reconnect, and masquerades traffic so any device routed through the labstation reaches the work network transparently.
 

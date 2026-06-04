@@ -14,7 +14,7 @@ WORKDIR /app
 COPY scripts/ ./scripts/
 RUN chmod +x ./scripts/*.sh
 
-EXPOSE 8080
+EXPOSE 9798
 ENTRYPOINT ["./scripts/entrypoint.sh"]
 
 # ── Test target ───────────────────────────────────────────────────────────────

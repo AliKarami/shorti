@@ -26,7 +26,7 @@ docker run -d \
     -e SHORTI_TOTP_SECRET=JBSWY3DPEHPK3PXP \
     -e SHORTI_MAX_RETRIES=1 \
     -e SHORTI_RETRY_DELAY=1 \
-    -p "${PORT}:8080" \
+    -p "${PORT}:9798" \
     shorti:smoke
 
 echo "==> Waiting for health endpoint (up to 15s)..."
