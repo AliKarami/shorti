@@ -1,5 +1,10 @@
 services:
   vpn:
+    # Prebuilt image on GHCR. To use it without building locally:
+    #   docker compose pull && docker compose up -d
+    # To build from source instead (developers), the `build` block below is used
+    # by `docker compose up -d --build`.
+    image: ghcr.io/alikarami/shorti:latest
     build:
       context: .
       # Pin the production stage. Without this, `build: .` picks the LAST stage

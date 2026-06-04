@@ -38,6 +38,25 @@ The container runs with **`network_mode: host`** so the tunnel, routes, IP
 forwarding, and NAT rules live in the host's network namespace — which is what
 makes the gateway host's own IP a valid gateway for Mikrotik-routed traffic.
 
+## Prebuilt image
+
+A multi-arch image (`linux/amd64`, `linux/arm64`) is published to GHCR on every
+release, so you can skip the local build:
+
+```bash
+docker pull ghcr.io/alikarami/shorti:latest
+```
+
+The bundled `compose.yml` already points at it — just pull and start:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Tags: `latest`, plus `MAJOR`, `MAJOR.MINOR`, and the full `MAJOR.MINOR.PATCH` for
+each release (e.g. `:1`, `:1.0`, `:1.0.0`). To build from source instead, use
+`docker compose up -d --build`.
+
 ## Quick start
 
 0. **Enable IP forwarding on the host** (one-time). Because the container runs in
