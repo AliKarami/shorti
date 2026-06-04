@@ -41,10 +41,9 @@ increment_reconnect_count() {
 }
 
 is_connected() {
-    if [[ ! -f "$PIDFILE" ]]; then return 1; fi
-
     local pid
-    pid="$(<"$PIDFILE")"
+    pid="$(<"$PIDFILE" 2>/dev/null)" || true
+    if [[ -z "$pid" ]]; then return 1; fi
     if ! ps -p "$pid" &>/dev/null; then return 1; fi
 
     if ! ip tuntap show 2>/dev/null | grep -q tun; then return 1; fi
@@ -60,8 +59,20 @@ connect_with_retry() {
     local attempt=1
     while (( attempt <= MAX_RETRIES )); do
         _log "INFO" "Connection attempt $attempt of $MAX_RETRIES"
-        if vpn_connect && setup_routing; then
-            return 0
+        if vpn_connect; then
+            if setup_routing; then
+                return 0
+            else
+                # VPN connected but routing failed — tear down before retry
+                _log "WARN" "Routing setup failed — tearing down tunnel before retry"
+                teardown_routing || true
+                if [[ -f "$PIDFILE" ]]; then
+                    local pid
+                    pid="$(<"$PIDFILE" 2>/dev/null)" || true
+                    [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+                    rm -f "$PIDFILE"
+                fi
+            fi
         fi
         if (( attempt < MAX_RETRIES )); then
             _log "WARN" "Attempt $attempt failed — retrying in ${RETRY_DELAY}s"
@@ -77,10 +88,14 @@ _cleanup() {
     _log "INFO" "Shutting down"
     teardown_routing || true
     if [[ -f "$PIDFILE" ]]; then
-        local pid="$(<"$PIDFILE")"
-        kill "$pid" 2>/dev/null || true
-        sleep 1
-        kill -9 "$pid" 2>/dev/null || true
+        local pid
+        pid="$(<"$PIDFILE" 2>/dev/null)" || true
+        if [[ -n "$pid" ]]; then
+            kill "$pid" 2>/dev/null || true
+            sleep 1
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "$PIDFILE"
     fi
     exit 0
 }
@@ -97,7 +112,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     connect_with_retry || _log "WARN" "Initial connect failed — will retry in background loop"
 
     while true; do
-        sleep "$MONITOR_INTERVAL"
+        sleep "$MONITOR_INTERVAL" &
+        wait $!
         if ! is_connected; then
             _log "WARN" "Tunnel down — reconnecting (reconnects so far: $(get_reconnect_count))"
             increment_reconnect_count
