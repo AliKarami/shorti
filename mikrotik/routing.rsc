@@ -4,7 +4,6 @@
 # Assumptions:
 #   - shorti labstation LAN IP: 192.168.1.50  (change to match yours)
 #   - Work VPN subnets: 10.0.0.0/8            (change to match your VPN's pushed routes)
-#   - Your LAN interface: bridge (or ether1 — adjust as needed)
 #
 # Apply with: /import file=routing.rsc
 
