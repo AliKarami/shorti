@@ -44,7 +44,8 @@ is_connected() {
     local pid
     pid="$(<"$PIDFILE" 2>/dev/null)" || true
     if [[ -z "$pid" ]]; then _log "WARN" "health: pidfile empty/missing"; return 1; fi
-    if ! ps -p "$pid" &>/dev/null; then _log "WARN" "health: openconnect (pid $pid) not running"; return 1; fi
+    # kill -0 is a shell builtin (works under Alpine/busybox, which has no `ps -p`).
+    if ! kill -0 "$pid" 2>/dev/null; then _log "WARN" "health: openconnect (pid $pid) not running"; return 1; fi
 
     if ! ip tuntap show 2>/dev/null | grep -q tun; then _log "WARN" "health: tun interface gone (openconnect $pid alive)"; return 1; fi
 

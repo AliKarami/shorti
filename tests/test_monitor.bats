@@ -30,7 +30,7 @@ teardown() {
 }
 
 @test "is_connected returns failure when tun interface is missing" {
-    echo "$$" > "$PIDFILE"   # use current test PID so ps check passes
+    echo "$$" > "$PIDFILE"   # use current test PID so the liveness check passes
     run is_connected
     [ "$status" -ne 0 ]
 }

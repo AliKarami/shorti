@@ -113,16 +113,26 @@ All configuration is via environment variables in `.env`.
 
 ## Troubleshooting
 
-**Connects, then reconnects every ~30s (new PID each time).** openconnect is
-genuinely dropping the tunnel; the watchdog is doing its job. Check the reason in
-the container log:
+**Connects, then reconnects every ~30s (new PID each time).** First check *why*
+the watchdog thinks the tunnel is down — it logs the failing health check:
 
 ```bash
 docker compose exec vpn tail -n 60 /var/log/shorti/shorti.log
 ```
 
-The usual cause with FortiGate is the **DTLS heartbeat**. If the log shows the
-data channel on DTLS and an unrecognized heartbeat packet, like:
+- `health: openconnect (pid N) not running` while openconnect is actually alive
+  means the liveness check itself is broken (e.g. using `ps -p`, which busybox on
+  Alpine doesn't support — shorti uses the `kill -0` builtin instead). A genuine
+  manual `openconnect` run staying up while the daemon drops on the dot every
+  `SHORTI_MONITOR_INTERVAL` is the tell-tale sign the watchdog is the culprit, not
+  the tunnel.
+- `health: ping <host> failed` means routing to `SHORTI_PING_HOST` is broken even
+  though the tunnel is up — check the host route / `SHORTI_PING_HOST` is reachable
+  through the VPN.
+
+If instead the log shows openconnect *itself* dropping the data channel, the usual
+cause with FortiGate is the **DTLS heartbeat**. If the log shows the data channel
+on DTLS and an unrecognized heartbeat packet, like:
 
 ```
 Configured as 10.x.x.x, with SSL disconnected and DTLS established
