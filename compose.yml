@@ -1,6 +1,11 @@
 services:
   vpn:
-    build: .
+    build:
+      context: .
+      # Pin the production stage. Without this, `build: .` picks the LAST stage
+      # in the Dockerfile (`test`), which would run the bats suite on a loop
+      # instead of the VPN gateway.
+      target: base
     container_name: shorti-vpn
     restart: unless-stopped
     # Host networking: tun0, routes, IP forwarding, and the iptables MASQUERADE
