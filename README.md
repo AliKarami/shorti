@@ -40,6 +40,15 @@ makes the gateway host's own IP a valid gateway for Mikrotik-routed traffic.
 
 ## Quick start
 
+0. **Enable IP forwarding on the host** (one-time). Because the container runs in
+   host network mode, the kernel's forwarding setting belongs to the host and
+   can't be set from Compose:
+
+   ```bash
+   echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-shorti.conf
+   sudo sysctl --system
+   ```
+
 1. **Configure.** Copy the template and fill in your VPN details:
 
    ```bash
@@ -127,6 +136,8 @@ helpers can be unit-tested in isolation.
 ## Requirements
 
 - A Linux host with Docker + Docker Compose v2
+- IP forwarding enabled on the host: `net.ipv4.ip_forward=1` (see Quick start
+  step 0 — under host networking this must be set on the host, not in Compose)
 - `/dev/net/tun` available and the `NET_ADMIN` capability (granted in `compose.yml`)
 - A router (e.g. Mikrotik) to route the VPN's subnets at the gateway host — optional
   if you only want the gateway on the host itself

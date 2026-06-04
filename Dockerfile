@@ -1,14 +1,22 @@
-FROM ubuntu:24.04 AS base
+FROM alpine:3.21 AS base
 
-RUN apt-get update && apt-get install -y \
+# bash            — scripts use bash arrays, BASH_SOURCE, declare -f, etc.
+# openconnect     — Fortinet VPN tunnel (ships /etc/vpnc/vpnc-script for routing)
+# oath-toolkit-oathtool — TOTP generation (totp.sh)
+# iproute2        — `ip tuntap show` / route setup
+# iptables        — MASQUERADE + FORWARD gateway rules (routing.sh)
+# iputils-ping    — tunnel health probe (`ping -W`)
+# curl            — healthcheck client
+# python3         — health.sh HTTP server + totp.sh fallback
+RUN apk add --no-cache \
+    bash \
     openconnect \
-    oathtool \
+    oath-toolkit-oathtool \
     iproute2 \
     iptables \
     iputils-ping \
     curl \
-    python3 \
-    && rm -rf /var/lib/apt/lists/*
+    python3
 
 WORKDIR /app
 COPY scripts/ ./scripts/
@@ -20,7 +28,7 @@ ENTRYPOINT ["./scripts/entrypoint.sh"]
 # ── Test target ───────────────────────────────────────────────────────────────
 FROM base AS test
 
-RUN apt-get update && apt-get install -y bats && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache bats
 
 COPY tests/ ./tests/
 ENTRYPOINT ["bats", "--tap", "tests/"]

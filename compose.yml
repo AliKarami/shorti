@@ -14,8 +14,11 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    sysctls:
-      - net.ipv4.ip_forward=1
+    # NOTE: net.ipv4.ip_forward is NOT set here. Under host networking Docker
+    # refuses to set namespaced net.* sysctls (they'd mutate the host namespace).
+    # Enable IP forwarding on the host once instead — see README "Requirements":
+    #   echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-shorti.conf
+    #   sudo sysctl --system
     env_file:
       - .env
     volumes:

@@ -56,8 +56,14 @@ setup_routing() {
     # Flush first to ensure idempotency
     _flush_rules "$tun" "$lan"
 
-    # Enable IP forwarding
-    echo 1 > /proc/sys/net/ipv4/ip_forward
+    # Enable IP forwarding. Under host networking this proc entry belongs to the
+    # host and is typically read-only from inside the container, so treat a write
+    # failure as non-fatal and tell the operator to enable it on the host.
+    if [[ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" != "1" ]]; then
+        if ! echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null; then
+            _log "WARN" "IP forwarding is off and could not be enabled from the container. Run on the host: sudo sysctl -w net.ipv4.ip_forward=1 (persist via /etc/sysctl.d/99-shorti.conf)"
+        fi
+    fi
 
     # Masquerade all traffic leaving through the VPN tunnel
     iptables -t nat -A POSTROUTING -o "$tun" -j MASQUERADE

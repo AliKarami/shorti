@@ -35,7 +35,14 @@ Your device (192.168.1.x)
 
 ## Prerequisites
 
-1. shorti is running on your gateway host:
+1. IP forwarding is enabled on the gateway host (required under host networking,
+   one-time):
+   ```bash
+   echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-shorti.conf
+   sudo sysctl --system
+   ```
+
+2. shorti is running on your gateway host:
    ```bash
    docker compose up -d
    docker ps                       # STATUS shows (healthy) once the tunnel is up
@@ -46,7 +53,7 @@ Your device (192.168.1.x)
    The container has a Docker healthcheck wired to `/health`, so `docker ps`
    reflects the live tunnel state without needing to curl.
 
-2. You know your VPN's pushed subnets (ask your network admin, or check `ip route`
+3. You know your VPN's pushed subnets (ask your network admin, or check `ip route`
    inside the running container after it connects: `docker exec shorti-vpn ip route`).
 
 ## Mikrotik Setup
