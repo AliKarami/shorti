@@ -121,18 +121,31 @@ the container log:
 docker compose exec vpn tail -n 60 /var/log/shorti/shorti.log
 ```
 
-The most common cause with Fortinet is a broken UDP/ESP data channel (the TLS
-control channel stays up, but Dead Peer Detection on the data channel fails after
-~30s and openconnect tears down). Force the connection to stay on TLS only:
+The usual cause with FortiGate is the **DTLS heartbeat**. If the log shows the
+data channel on DTLS and an unrecognized heartbeat packet, like:
+
+```
+Configured as 10.x.x.x, with SSL disconnected and DTLS established
+...
+Unexpected pre-PPP packet header for encap 5.
+< 0000:  00 13 47 46 74 79 70 65  00 68 65 61 72 74 62 65  |..GFtype.heartbe|
+```
+
+then openconnect (even the current v9.12) doesn't answer FortiGate's heartbeat on
+the DTLS channel, so the server drops the session at its ~30s heartbeat timeout.
+Keep the data channel on TLS instead:
 
 ```bash
-# in .env
+# in .env, then: docker compose up -d --force-recreate
 SHORTI_EXTRA_ARGS=--no-dtls
 ```
 
-then `docker compose up -d --force-recreate`. Other knobs in `SHORTI_EXTRA_ARGS`
-worth trying if the log points elsewhere: `--no-http-keepalive`, or an explicit
-MTU like `-m 1300`.
+Other knobs in `SHORTI_EXTRA_ARGS` if the log points elsewhere:
+`--no-http-keepalive`, or an explicit MTU like `-m 1300`.
+
+> The `Cannot open "/proc/sys/net/ipv4/route/flush": Read-only file system` lines
+> from the vpnc-script are harmless (Docker mounts `/proc/sys` read-only) and are
+> not the cause of disconnects.
 
 **`docker logs` shows nothing about the disconnect.** Fixed — openconnect now runs
 in the foreground (backgrounded by the supervisor) so its full output, including
