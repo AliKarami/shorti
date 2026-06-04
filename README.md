@@ -120,12 +120,17 @@ the watchdog thinks the tunnel is down — it logs the failing health check:
 docker compose exec vpn tail -n 60 /var/log/shorti/shorti.log
 ```
 
+- `health: pidfile empty/missing` while openconnect *is* running means the
+  watchdog can't read its own pidfile. The classic cause is the bash gotcha
+  `pid="$(<"$f" 2>/dev/null)"` — the extra redirection disables the `$(<file)`
+  fast path and yields an **empty string every time**, so the check always fails.
+  shorti reads it as `[[ -f "$f" ]] && pid="$(<"$f")"` instead.
 - `health: openconnect (pid N) not running` while openconnect is actually alive
   means the liveness check itself is broken (e.g. using `ps -p`, which busybox on
-  Alpine doesn't support — shorti uses the `kill -0` builtin instead). A genuine
-  manual `openconnect` run staying up while the daemon drops on the dot every
-  `SHORTI_MONITOR_INTERVAL` is the tell-tale sign the watchdog is the culprit, not
-  the tunnel.
+  Alpine doesn't support — shorti uses the `kill -0` builtin instead).
+- A genuine manual `openconnect` run that stays up while the daemon drops on the
+  dot every `SHORTI_MONITOR_INTERVAL` is the tell-tale sign the watchdog is the
+  culprit, not the tunnel — check the health-check messages above first.
 - `health: ping <host> failed` means routing to `SHORTI_PING_HOST` is broken even
   though the tunnel is up — check the host route / `SHORTI_PING_HOST` is reachable
   through the VPN.

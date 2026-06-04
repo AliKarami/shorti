@@ -41,8 +41,11 @@ increment_reconnect_count() {
 }
 
 is_connected() {
-    local pid
-    pid="$(<"$PIDFILE" 2>/dev/null)" || true
+    # Read with a BARE $(<file) — adding `2>/dev/null` (or any second
+    # redirection) silently disables bash's $(<file) fast path so the result is
+    # ALWAYS empty, which made every health check declare the tunnel dead.
+    local pid=""
+    [[ -f "$PIDFILE" ]] && pid="$(<"$PIDFILE")"
     if [[ -z "$pid" ]]; then _log "WARN" "health: pidfile empty/missing"; return 1; fi
     # kill -0 is a shell builtin (works under Alpine/busybox, which has no `ps -p`).
     if ! kill -0 "$pid" 2>/dev/null; then _log "WARN" "health: openconnect (pid $pid) not running"; return 1; fi
@@ -69,7 +72,7 @@ connect_with_retry() {
                 teardown_routing || true
                 if [[ -f "$PIDFILE" ]]; then
                     local pid
-                    pid="$(<"$PIDFILE" 2>/dev/null)" || true
+                    pid="$(<"$PIDFILE")"
                     [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
                     rm -f "$PIDFILE"
                 fi
@@ -90,7 +93,7 @@ _cleanup() {
     teardown_routing || true
     if [[ -f "$PIDFILE" ]]; then
         local pid
-        pid="$(<"$PIDFILE" 2>/dev/null)" || true
+        pid="$(<"$PIDFILE")"
         if [[ -n "$pid" ]]; then
             kill "$pid" 2>/dev/null || true
             sleep 1

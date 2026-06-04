@@ -67,7 +67,7 @@ _wait_for_tunnel() {
 _kill_existing() {
     if [[ -f "$PIDFILE" ]]; then
         local oldpid
-        oldpid="$(<"$PIDFILE" 2>/dev/null)" || true
+        oldpid="$(<"$PIDFILE")"
         if [[ -n "$oldpid" ]] && kill -0 "$oldpid" 2>/dev/null; then
             kill "$oldpid" 2>/dev/null || true
             local t=0
