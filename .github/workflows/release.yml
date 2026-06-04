@@ -10,6 +10,12 @@ on:
     tags:
       - 'v*'
 
+# A published release also pushes its tag — both events fire. Collapse the
+# duplicate runs for the same ref so the image is built and pushed only once.
+concurrency:
+  group: ghcr-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}   # AliKarami/shorti → lowercased by metadata-action
