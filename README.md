@@ -111,6 +111,33 @@ All configuration is via environment variables in `.env`.
 | `GET /health` | `200 {"status":"connected"}` or `503 {"status":"disconnected"}` |
 | `GET /metrics` | `200` plain text: `vpn_connected=0\|1`, `vpn_reconnect_total=<n>` |
 
+## Troubleshooting
+
+**Connects, then reconnects every ~30s (new PID each time).** openconnect is
+genuinely dropping the tunnel; the watchdog is doing its job. Check the reason in
+the container log:
+
+```bash
+docker compose exec vpn tail -n 60 /var/log/shorti/shorti.log
+```
+
+The most common cause with Fortinet is a broken UDP/ESP data channel (the TLS
+control channel stays up, but Dead Peer Detection on the data channel fails after
+~30s and openconnect tears down). Force the connection to stay on TLS only:
+
+```bash
+# in .env
+SHORTI_EXTRA_ARGS=--no-dtls
+```
+
+then `docker compose up -d --force-recreate`. Other knobs in `SHORTI_EXTRA_ARGS`
+worth trying if the log points elsewhere: `--no-http-keepalive`, or an explicit
+MTU like `-m 1300`.
+
+**`docker logs` shows nothing about the disconnect.** Fixed — openconnect now runs
+in the foreground (backgrounded by the supervisor) so its full output, including
+disconnect reasons, is written to `/var/log/shorti/shorti.log` instead of syslog.
+
 ## Development
 
 The full test suite runs in a container — no real VPN required:

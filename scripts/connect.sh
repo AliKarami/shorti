@@ -62,11 +62,29 @@ _wait_for_tunnel() {
     return 1
 }
 
+# Tear down any openconnect from a previous attempt so we never stack two
+# sessions — the server may drop the older one, which looks like reconnect churn.
+_kill_existing() {
+    if [[ -f "$PIDFILE" ]]; then
+        local oldpid
+        oldpid="$(<"$PIDFILE" 2>/dev/null)" || true
+        if [[ -n "$oldpid" ]] && kill -0 "$oldpid" 2>/dev/null; then
+            kill "$oldpid" 2>/dev/null || true
+            local t=0
+            while (( t < 5 )) && kill -0 "$oldpid" 2>/dev/null; do sleep 1; (( t++ )); done
+            kill -9 "$oldpid" 2>/dev/null || true
+        fi
+        rm -f "$PIDFILE"
+    fi
+}
+
 vpn_connect() {
     # Source totp.sh if generate_totp isn't already defined
     if ! declare -f generate_totp &>/dev/null; then
         source "$(dirname "${BASH_SOURCE[0]}")/totp.sh"
     fi
+
+    _kill_existing
 
     local password otp server_url
     password="$(get_password)"   || return 1
@@ -85,30 +103,35 @@ vpn_connect() {
         extra_flags+=("${_extra[@]}")
     fi
 
+    # Background openconnect ourselves rather than using --background. With
+    # --background, openconnect daemonizes and logs to syslog — which the
+    # container doesn't run — so the reason for any later disconnect (dead peer,
+    # ESP failure, server reset, …) would be lost. Running it in the foreground
+    # and backgrounding with `&` keeps its full output in the log file.
+    local log_file="${SHORTI_LOG_FILE:-/var/log/shorti/shorti.log}"
     openconnect \
         --protocol=fortinet \
         -u "$SHORTI_USERNAME" \
         --passwd-on-stdin \
-        --pid-file "$PIDFILE" \
-        --background \
         "${extra_flags[@]}" \
         "$server_url" \
-        >> "${SHORTI_LOG_FILE:-/var/log/shorti/shorti.log}" 2>&1 <<EOF
+        >> "$log_file" 2>&1 <<EOF &
 $password
 $otp
 EOF
-    local rc=$?
+    local oc_pid=$!
+    echo "$oc_pid" > "$PIDFILE"
 
-    # --background forks immediately; rc is a fork-failure indicator only,
-    # NOT an auth-success signal. Real success is verified by _wait_for_tunnel
-    # + verify_tunnel below. Set SHORTI_PING_HOST for the strongest health check.
-    if [[ $rc -ne 0 ]]; then
-        _log "ERROR" "openconnect fork failed (exit code: $rc)"
+    # Auth failures make openconnect exit almost immediately.
+    sleep 1
+    if ! kill -0 "$oc_pid" 2>/dev/null; then
+        _log "ERROR" "openconnect exited immediately — check credentials/OTP (see $log_file)"
+        rm -f "$PIDFILE"
         return 1
     fi
 
     if ! _wait_for_tunnel; then
-        _log "ERROR" "Tun interface did not appear within 15 seconds — auth may have failed"
+        _log "ERROR" "Tun interface did not appear within 15 seconds — auth may have failed (see $log_file)"
         return 1
     fi
 
@@ -120,7 +143,7 @@ EOF
         return 1
     fi
 
-    _log "INFO" "VPN connected (pid: $(<"$PIDFILE"))${SHORTI_PING_HOST:+ — ping host: $SHORTI_PING_HOST}"
+    _log "INFO" "VPN connected (pid: $oc_pid)${SHORTI_PING_HOST:+ — ping host: $SHORTI_PING_HOST}"
     return 0
 }
 
