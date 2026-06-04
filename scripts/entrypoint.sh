@@ -8,6 +8,7 @@ set -euo pipefail
 export SHORTI_LOG_FILE="${SHORTI_LOG_FILE:-/var/log/shorti/shorti.log}"
 
 _log() {
+    mkdir -p "$(dirname "$SHORTI_LOG_FILE")" 2>/dev/null || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] entrypoint: $*" \
         | tee -a "$SHORTI_LOG_FILE"
 }
